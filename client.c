@@ -12,6 +12,15 @@
 #include <limits.h>
 
 #define FILE_SIZE 1000
+
+
+/*-------------------------------------------------------------
+Protótipo: main(int argc, char *argv[])
+Função: Executar todas as funções do cliente
+Entrada: (int) endereco do host, (int) porta para comunicação, (string) nome do arquivo, (int) tamanho do buffer
+Saída: Status da conexão (0 - falta parametros, 1 - sucesso, 2 - falha)
+-------------------------------------------------------------*/
+
 int main (int argc, char * argv[])
 {
   //Definicao de variaveis
@@ -20,16 +29,20 @@ int main (int argc, char * argv[])
   struct hostent *host, *gethostbyname();
   int validacao;
   int status = 2;
-  char t[30]="Será que vai funcionar", texto_arquivo[FILE_SIZE];
+  // char t[30]="Será que vai funcionar", texto_arquivo[FILE_SIZE];
   FILE *arq;
   
   int sent_status, j, count = 0, bytes = 0;
+
+  //Criacao de variaveis para verificacao de desempenho
+  struct timeval tvalBefore, tvalAfter;
+  gettimeofday (&tvalBefore, NULL);
 
   //verifica se o número de parâmetros enviados está correto
   if (argc < 5)
   {
     printf("Utilização: ./client host_do_servidor porto_servidor nome_arquivo buffer_length_buffer\n");
-    exit(EXIT_FAILURE);
+    return status = 0;
   }
 
   //atribui parâmetros as variáveis adequadas
@@ -56,8 +69,9 @@ int main (int argc, char * argv[])
     printf("\nErro de conexão com o servidor através de Socket\n");
     exit(1);
   }
-  printf("Consegui conectar!\n");
+  //printf("Consegui conectar!\n");
   bzero(msg, sizeof(msg));
+
   // Envia nome do arquivo para o servidor
   for(j=0; argv[3][j] != '\0'; ++j){
     if (count >= buffer_length){
@@ -72,19 +86,14 @@ int main (int argc, char * argv[])
       }
 
       //Caso contrario, mensagem enviada com sucesso
-      printf("Consegui enviar para o cliente uma mensagem: %s\n", msg);
+      //printf("Consegui enviar para o cliente uma mensagem: %s\n", msg);
       //Conta bytes enviaqdos
       bytes += count;
       //Contador de caracteres na mensagem
       count = 0;
     } 
 
-    // printf("Vou tentar printar o char\n");
-    // printf("%c",argv[3][j]);
-    // printf("Vou tentar dar strcat em: %s e %c\n", msg, argv[3][j]);
     msg[count] =  argv[3][j];  
-    // printf("Consegui dar strcat\n");
-    //Conta quantos caracteres foram adicionados
     count += 1;
   }
 
@@ -93,7 +102,7 @@ int main (int argc, char * argv[])
       if(count < buffer_length){
         msg[count] = '\0';
       }
-         printf("Consegui enviar para o cliente uma mensagem: %s\n", msg);
+         //printf("Consegui enviar para o cliente uma mensagem: %s\n", msg);
         sent_status = write(sock, msg, sizeof(msg));
         //Se write retornou -1, houve erro na conexão
         if (sent_status < 0){
@@ -104,16 +113,16 @@ int main (int argc, char * argv[])
         }
       bytes += count;
   }
+
   sent_status = write(sock, "/", 1);
   //Se write retornou -1, houve erro na conexão
-  printf("Consegui enviar para o cliente uma mensagem: %s\n", "/");
+  //printf("Consegui enviar para o cliente uma mensagem: %s\n", "/");
   if (sent_status < 0){
     perror("writing on stream socket");
     close(sock);
     return status;
   }
 
-  sleep(1);
   bzero(msg, sizeof(msg));
   int n_msg =0;
   FILE *output;
@@ -122,12 +131,12 @@ int main (int argc, char * argv[])
       perror("Error opening file.");
       exit(1);
   }
-
+  bytes = 0;
   //Le o conteudo do arquivo de texto enviado pelo servidor
-  while (r_val_read > 0 || n_msg == 0){
+  while (r_val_read > 0 ){ //|| n_msg == 0
     bzero(buf, sizeof(buf));
     r_val_read = recv(sock, buf, buffer_length, 0); //(char *)
-    printf("Consegui dar o read: %d\n", r_val_read);
+    //printf("Consegui dar o read: %d\n", r_val_read);
 
     //Se read não conseguiu ler nenhum dado, retorna -1
     if ((r_val_read) < 0){
@@ -136,89 +145,33 @@ int main (int argc, char * argv[])
       return status;
     }
 
-    //Se a mensagem tiver terminado, read retorna 0
+    //Se a mensagem tiver terminado, sai do loop
     else if (r_val_read == 0)
       printf("Nothing to be read\n");
 
     else if (r_val_read ==1 ){
       if(buf[0] == '/'){
-      printf("Ending read\n");
+      //printf("Ending read\n");
       break;
       }
     }
 
     //Senão, continua lendo do buffer
     else{
-      printf("%s\n", buf);
-      printf("Vou tentar escrever no arquivo: %s\n", buf);
-      // int i = 0;
-      // for(i=0; i < sizeof(buf); i++ ){
-      //   texto_arquivo[buffer_length*n_msg + i] = buf[i];
-      // }
-      // n_msg += 1;
-      // printf("Consegui dar strcat\n");
+      //printf("%s\n", buf);
+      //printf("Vou tentar escrever no arquivo: %s\n", buf);
       buf[r_val_read] = '\0';
       fprintf(output, "%s", buf);
-      printf("-->%s\n", buf);
+      //printf("-->%s\n", buf);
       n_msg +=1;
+      bytes +=sizeof(buf);
     }
   } 
   fclose(output);
+  //Medidas de desempenho
+  gettimeofday (&tvalAfter, NULL);
+  printf("Tempo em us: %ld us\n",
+            ((tvalAfter.tv_sec - tvalBefore.tv_sec)*1000000L
+           +tvalAfter.tv_usec) - tvalBefore.tv_usec);
+  // printf ("/n Bytes enviados: %d\n",   bytes);
 }
-
-
-  //############################DESCOMENTAR ATE AQUI ######################
-  // int n_try = 0;
-
-
-  // close(sock);
-
-  // Tenta conectar-se ao servidor
-  // if ( connect(sock, (struct sockaddr *)&server, sizeof (server) ) == -1)
-  // {
-  //   printf("\nErro de conexão com o servidor através de Socket\n");
-  //   exit(1);
-  // }
-  // printf("Consegui conectar!\n");
-      
-
-        // while(n_try <100){
-
-  //   if ( connect(sock, (struct sockaddr *)&server, sizeof (server) ) == -1)
-  //   {
-  //     printf("\nErro de conexão com o servidor através de Socket\n");
-  //     // exit(1);
-  //   }
-  //   else{
-  //     printf("Consegui conectar!\n");
-  //     break;
-  //   }
-  //   n_try += 1;
-  // }
-  /*
- *  A partir deste ponto o cliente já está em comunicação com o
- *  servidor através do socket ---> sock
- */
-
-  /*
- *  Insira neste ponto todo o código necessário para a comunicação
- *  cliente/servidor
- */
-
-  /*  
- // *  O cliente lê do servidor um caracter
- // */
- //  validacao = read (sock, (char *) &resp, 1);
- //  /*
- // *  Ecoa no terminal do cliente o caracter recebido do servidor
- // */
- //  printf("\nConsegui ler do servidor o caracter: %c\n\n",resp);
-
-    
- // *  O cliente escreve no servidor uma string de 30 caracteres
- 
- //  validacao = write (sock, (void *)t, 30);
- //  /*
- // *  Ecoa no terminal do cliente a string enviada para o servidor
- // */
- //  printf("\nConsegui escrever para o servidor a string: %s\n",t);
