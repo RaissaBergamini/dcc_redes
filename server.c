@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <limits.h>
+#include <stdbool.h>
 
 #define FILE_NAME_SIZE 200
 
@@ -76,6 +77,13 @@ int main (int argc, char * argv[])
   listen(sock,10);
   length = sizeof (cliente);
   int n_msg = 0;
+  int count = 0;
+  int bytes = 0;
+  int sent_status; 
+  bool end_file = false;
+  bzero(arquivo, sizeof(arquivo));
+  FILE *arq;
+  char ch;
   for (;;) {
     connected = accept(sock, (struct sockaddr *)&cliente,&length);
     printf("Conectou 1 cliente....\n");
@@ -84,7 +92,6 @@ int main (int argc, char * argv[])
       return status;
     }
     else {
-      bzero(msg, sizeof(msg));
       while (r_val_read > 0){
         bzero(buf, sizeof(buf));
         //Tenta ler mensagem do socket
@@ -97,13 +104,13 @@ int main (int argc, char * argv[])
           close(sock);
           return status;
         }
-
         //Se a mensagem tiver terminado, read retorna 0
-        else if (strstr(arquivo,"\0") != NULL){
-          printf("Ending connection\n");
+        else if (r_val_read ==1 ){
+          if(buf[0] == '/'){
+          printf("Ending read\n");
           break;
+          }
         }
-        
         //Senão, continua lendo do buffer
         else{
           printf("%s\n", buf);
@@ -118,33 +125,40 @@ int main (int argc, char * argv[])
           printf("Valor de Rvalue = %d\n", r_val_read);
         }
       }
-    }
-    // close(connected);
-    printf("Conexao fechada\n");
-    printf("Consegui ler o nome do arquivo: %s\n", arquivo);
-    // connected = accept(sock, (struct sockaddr *)&cliente,&length);
-    if (arquivo != ""){
-      printf("O nome do arquivo foi lido e vamos enviar seu conteudo para o cliente!\n" );
-      FILE *arq;
-      char ch;
-      arq = fopen (arquivo, "r"); // abrir o arquivo para ler
-      printf("Consegui abrir o arquivo.");
+      bzero(msg, sizeof(msg));
+      printf("Terminei a leitura\n");
+      printf("Consegui ler o nome do arquivo: %s\n", arquivo);
+  //     break;
+  //   }
+  // }
+  // close(sock);
+  //   //Iniciar outra conexao
+  // for (;;) {
+  //   connected = accept(sock, (struct sockaddr *)&cliente,&length);
+  //   printf("Conectou 1 cliente....\n");
+  //   if (connected == -1){
+  //     perror("accept");
+  //     return status;
+  //   }
+  //   else {
+      // arquivo = "nome_do_arquivo.txt";
+      arq = fopen ("nome_do_arquivo.txt", "r"); // abrir o arquivo para ler
+      printf("Consegui abrir o arquivo.\n");
       if (arq == NULL) {
-        perror ("Houve um erro ao abrir o arquivo.\n");
+        printf ("Houve um erro ao abrir o arquivo.\n");
         close(sock);
         return status;
-      }
-      printf("Consegui abrir o arquivo.");
-      int count = 0;
-      int bytes = 0;
-      int sent_status; 
-      ch = getc(arq);
-      while( ch!= EOF){
+      } 
+      printf("Consegui abrir o arquivo.\n");
+      while(end_file == false){
         if (count >= buffer_length){
+          msg[count] = '\0';
           //envia mensagem pro clientee
-          sent_status = write(sock, msg, sizeof(msg)); //(void *) &resp
+          printf("Tentar mandar para o cliente\n");
+          sent_status = write(connected, msg, sizeof(msg)); //(void *) &resp
           // validacao = write (connected, (void *) &resp, 1);
           //Se write retornou -1, houve erro na conexão
+          printf("Status de envio: %d\n", sent_status);
           if (sent_status < 0){
             perror("writing on stream socket");
             close(sock);
@@ -154,16 +168,27 @@ int main (int argc, char * argv[])
           //Caso contrario, mensagem enviada com sucesso
           bytes += count;
           count = 0;
+          bzero(msg, sizeof(msg));
           // msg = "";
         } 
-        printf("%c",ch);
+        ch = getc(arq); 
+        if (ch == EOF){
+          end_file = true;
+          continue; 
+        }  
+        printf("Consegui ler um char: %c\n", ch);
+        // printf("%c",ch);
         msg[count]= ch;  
         count += 1;
-        ch = getc(arq);
+        // vch = getc(arq);
+
+      // }
+      // printf("O nome do arquivo foi lido e vamos enviar seu conteudo para o cliente!\n" );
       }
+
       
       if (msg != ""){
-          sent_status = write(sock, msg, sizeof(msg));
+          sent_status = write(connected, msg, sizeof(msg));
           //Se write retornou -1, houve erro na conexão
           if (sent_status < 0){
             perror("writing on stream socket");
@@ -171,20 +196,28 @@ int main (int argc, char * argv[])
             return status;
             //trabuffer_lengthento de erro 
           }
+          printf("Consegui enviar para o cliente uma mensagem: %s\n", msg);
         bytes += count;
       }
 
+      sent_status = write(connected, "/", 1);
+      printf("Consegui enviar para o cliente uma mensagem: %s\n", "/");
       //Fecha conexão e arquivo
-      fclose(arq);
-      printf ("Nome do Arquivo: %s, /n Bytes enviados: %d", arquivo, bytes);
-    }
-    // Calcula tempo
-  }
+      break;
+      // }
+      // Calcula tempo
+        
+     }
+   }
+  fclose(arq);
+  printf ("Nome do Arquivo: %s, /n Bytes enviados: %d\n", arquivo, bytes);
+  printf("Closing connection");
   close(sock);
   // unlink(address);
   status = 1;
   return status;
 }
+  
 
   /*
  *  A partir deste ponto o clientee já está em comunicação com o

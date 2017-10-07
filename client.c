@@ -57,8 +57,8 @@ int main (int argc, char * argv[])
     exit(1);
   }
   printf("Consegui conectar!\n");
-  
-  //Envia nome do arquivo para o servidor
+  bzero(msg, sizeof(msg));
+  // Envia nome do arquivo para o servidor
   for(j=0; argv[3][j] != '\0'; ++j){
     if (count >= buffer_length){
       //envia mensagem pro cliente
@@ -73,7 +73,7 @@ int main (int argc, char * argv[])
 
       //Caso contrario, mensagem enviada com sucesso
       printf("Consegui enviar para o cliente uma mensagem: %s\n", msg);
-      //Conta bytes enviados
+      //Conta bytes enviaqdos
       bytes += count;
       //Contador de caracteres na mensagem
       count = 0;
@@ -87,7 +87,7 @@ int main (int argc, char * argv[])
     //Conta quantos caracteres foram adicionados
     count += 1;
   }
-  
+
   //Manda a mensagem que esta no buffer
   if (count <= buffer_length){
       if(count < buffer_length){
@@ -104,28 +104,29 @@ int main (int argc, char * argv[])
         }
       bytes += count;
   }
-  sent_status = write(sock, "", 0);
+  sent_status = write(sock, "/", 1);
   //Se write retornou -1, houve erro na conexão
-  printf("Consegui enviar para o cliente uma mensagem: %s\n", "");
+  printf("Consegui enviar para o cliente uma mensagem: %s\n", "/");
   if (sent_status < 0){
     perror("writing on stream socket");
     close(sock);
     return status;
   }
-  // close(sock);
 
-  // Tenta conectar-se ao servidor
-  // if ( connect(sock, (struct sockaddr *)&server, sizeof (server) ) == -1)
-  // {
-  //   printf("\nErro de conexão com o servidor através de Socket\n");
-  //   exit(1);
-  // }
-  // printf("Consegui conectar!\n");
-
+  sleep(1);
+  bzero(msg, sizeof(msg));
   int n_msg =0;
+  FILE *output;
+  output =fopen("output.txt", "w");
+  if(output==NULL) {
+      perror("Error opening file.");
+      exit(1);
+  }
+
   //Le o conteudo do arquivo de texto enviado pelo servidor
-  while (r_val_read > 0){
-    r_val_read = read(sock, buf, buffer_length); //(char *)
+  while (r_val_read > 0 || n_msg == 0){
+    bzero(buf, sizeof(buf));
+    r_val_read = recv(sock, buf, buffer_length, 0); //(char *)
     printf("Consegui dar o read: %d\n", r_val_read);
 
     //Se read não conseguiu ler nenhum dado, retorna -1
@@ -137,24 +138,63 @@ int main (int argc, char * argv[])
 
     //Se a mensagem tiver terminado, read retorna 0
     else if (r_val_read == 0)
-      printf("Ending connection\n");
+      printf("Nothing to be read\n");
+
+    else if (r_val_read ==1 ){
+      if(buf[0] == '/'){
+      printf("Ending read\n");
+      break;
+      }
+    }
 
     //Senão, continua lendo do buffer
     else{
       printf("%s\n", buf);
-      printf("Vou tentar dar strcat em: %s e %s\n", texto_arquivo, buf);
-      int i = 0;
-      for(i=0; i < sizeof(buf); i++ ){
-        texto_arquivo[buffer_length*n_msg + i] = buf[i];
-      }
-      n_msg += 1;
-      printf("Consegui dar strcat\n");
+      printf("Vou tentar escrever no arquivo: %s\n", buf);
+      // int i = 0;
+      // for(i=0; i < sizeof(buf); i++ ){
+      //   texto_arquivo[buffer_length*n_msg + i] = buf[i];
+      // }
+      // n_msg += 1;
+      // printf("Consegui dar strcat\n");
+      buf[r_val_read] = '\0';
+      fprintf(output, "%s", buf);
       printf("-->%s\n", buf);
+      n_msg +=1;
     }
   } 
+  fclose(output);
 }
 
+
+  //############################DESCOMENTAR ATE AQUI ######################
+  // int n_try = 0;
+
+
+  // close(sock);
+
+  // Tenta conectar-se ao servidor
+  // if ( connect(sock, (struct sockaddr *)&server, sizeof (server) ) == -1)
+  // {
+  //   printf("\nErro de conexão com o servidor através de Socket\n");
+  //   exit(1);
+  // }
+  // printf("Consegui conectar!\n");
       
+
+        // while(n_try <100){
+
+  //   if ( connect(sock, (struct sockaddr *)&server, sizeof (server) ) == -1)
+  //   {
+  //     printf("\nErro de conexão com o servidor através de Socket\n");
+  //     // exit(1);
+  //   }
+  //   else{
+  //     printf("Consegui conectar!\n");
+  //     break;
+  //   }
+  //   n_try += 1;
+  // }
   /*
  *  A partir deste ponto o cliente já está em comunicação com o
  *  servidor através do socket ---> sock
